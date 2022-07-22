@@ -1,6 +1,8 @@
 import React from 'react';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import {doc, getDoc, setDoc} from 'firebase/firestore';
+// import {doc, getDoc, setDoc} from 'firebase/firestore';
+import firestore from '@react-native-firebase/firestore';
+
 import {
   SafeAreaView,
   StyleSheet,
@@ -14,33 +16,65 @@ import {
 import {db} from '../../firebaseConfig';
 import {useSelector, useDispatch} from 'react-redux';
 import {useEffect, useState} from 'react';
-import {todoList, deleteTodo} from '../store/todoSlice';
+import {todoList, deleteTodo, addTodo} from '../store/todoSlice';
 const COLORS = {primary: '#1f145c', white: '#fff'};
 
 const TodoScreen = () => {
   const todo = useSelector(state => state.tr.todo);
+  let arr = [...todo];
   const dispatch = useDispatch();
   const [input, setInput] = useState('');
-  //   useEffect(() => {
-  //     const myDoc = doc(db, 'todo', '1');
-  //     getDoc(myDoc).then(snapshot => {
-  //       if (snapshot.exists) {
-  //         alert('data read');
-  //         console.log(snapshot.data());
-  //         snapshot.data();
-  //       } else {
-  //         alert('document not found');
-  //       }
-  //     });
-  //   });
-  const createHandler = () => {
-    // const myDoc = doc(db, 'todo', '1');
+  const [refresh, setRefresh] = useState(0);
 
-    // setDoc(myDoc)
-    dispatch(todoList(input));
+  useEffect(() => {
+    try {
+      firestore()
+        .collection('Users')
+        .get()
+        .then(querySnapshot => {
+          //  console.log('Total users: ', querySnapshot._data);
+
+          querySnapshot.forEach(documentSnapshot => {
+            let data = {
+              title: documentSnapshot._data.title,
+              id: documentSnapshot.id,
+            };
+
+            arr.push(data);
+            
+          });
+          console.log('doc', arr);
+          // arr.filter((el,idx) => el.id !== documentSnapshot.id);
+          dispatch(todoList(arr));
+        });
+    } catch (error) {
+      console.log(error);
+    }
+  }, [refresh]);
+
+  const createHandler = async () => {
+    let payload = {title: input};
+    await firestore()
+      .collection('Users')
+      .add(payload)
+      .then(() => {
+        console.log('User added!');
+      });
+    dispatch(addTodo([payload]));
+    // window.location.reload();
+    setRefresh(Math.random() * 100);
   };
   const deleteHandler = id => {
-    dispatch(deleteTodo(id));
+    // console.log('id',id)
+    firestore()
+      .collection('Users')
+      .doc(id)
+      .delete()
+      .then(() => {
+        console.log('User deleted!');
+      });
+    // dispatch(deleteTodo(id));
+    setRefresh(Math.random() * 100);
   };
 
   //   const todo = useSelector(state => state.tr);
@@ -52,16 +86,20 @@ const TodoScreen = () => {
         </Text>
       </View>
       <FlatList
-        keyExtractor={el => el}
+        keyExtractor={el => el.id}
         data={todo}
-        renderItem={el => {
+        renderItem={({item}) => {
           return (
             <View style={styles.listItems}>
-              <View style={{flex: 1}}>
-                <Text style={styles.todoText}>{el.item}</Text>
-                <TouchableOpacity onPress={() => deleteHandler(el.index)}>
-                  <Text>❌</Text>
-                </TouchableOpacity>
+              <View style={{display: 'flex', justifyContent: 'flex-end'}}>
+                <View style={styles.innerInput}>
+                  <Text style={styles.todoText}>{item.title}</Text>
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => deleteHandler(item.id)}>
+                    <Text>❌</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           );
@@ -128,6 +166,16 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     paddingHorizontal: 20,
   },
+  innerInput: {
+    display: 'flex',
+    justifyContent: 'space-around',
+  },
+  deleteBtn: {
+    height: 25,
+    width: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   addContainer: {
     elevation: 40,
     height: 50,
@@ -138,14 +186,14 @@ const styles = StyleSheet.create({
     width: 50,
   },
   todoText: {
-    // marginVertical: 10,
+    marginVertical: 2,
   },
   listItems: {
-    marginVertical: 10,
+    marginVertical: 1,
     padding: 20,
-    flexDirection: 'row',
-    borderRadius: 15,
-    elevation: 12,
+    // flexDirection: 'row',
+    borderRadius: 5,
+    elevation: 10,
     color: COLORS.primary,
   },
 });
